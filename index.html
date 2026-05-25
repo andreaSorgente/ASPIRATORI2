@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Selezionatore Aspiratori</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Courier New', monospace;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #00d4aa;
+    margin-bottom: 0.25rem;
+  }
+
+  .subtitle {
+    font-size: 0.75rem;
+    color: #666;
+    letter-spacing: 0.1em;
+    margin-bottom: 2rem;
+  }
+
+  .panel {
+    background: #16213e;
+    border: 1px solid #0f3460;
+    border-radius: 4px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .panel-title {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #00d4aa;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid #0f3460;
+    padding-bottom: 0.5rem;
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  label {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: #888;
+    text-transform: uppercase;
+  }
+
+  input[type="number"], input[type="file"] {
+    background: #0d1b2a;
+    border: 1px solid #0f3460;
+    border-radius: 2px;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    padding: 0.5rem 0.75rem;
+    width: 100%;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  input[type="number"]:focus {
+    border-color: #00d4aa;
+  }
+
+  input[type="file"] {
+    padding: 0.4rem;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: #888;
+  }
+
+  .btn {
+    background: transparent;
+    border: 1px solid #00d4aa;
+    border-radius: 2px;
+    color: #00d4aa;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    padding: 0.6rem 1.25rem;
+    text-transform: uppercase;
+    transition: background 0.15s, color 0.15s;
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+
+  .btn:hover {
+    background: #00d4aa;
+    color: #1a1a2e;
+  }
+
+  .btn:active {
+    opacity: 0.8;
+  }
+
+  .btn-secondary {
+    border-color: #4a90d9;
+    color: #4a90d9;
+    margin-top: 0.25rem;
+  }
+
+  .btn-secondary:hover {
+    background: #4a90d9;
+    color: #1a1a2e;
+  }
+
+  .result-area {
+    background: #0d1b2a;
+    border: 1px solid #0f3460;
+    border-radius: 2px;
+    min-height: 80px;
+    padding: 1rem;
+    font-size: 0.85rem;
+    line-height: 1.8;
+  }
+
+  .result-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid #0f3460;
+  }
+
+  .result-row:last-child { border-bottom: none; }
+
+  .result-sheet {
+    color: #888;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+  }
+
+  .result-value {
+    color: #00d4aa;
+    font-weight: 700;
+  }
+
+  .result-value.error {
+    color: #e05555;
+    font-size: 0.75rem;
+  }
+
+  .result-portata {
+    color: #4a90d9;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .status {
+    font-size: 0.75rem;
+    color: #888;
+    margin-top: 0.75rem;
+  }
+
+  .status.ok { color: #00d4aa; }
+  .status.err { color: #e05555; }
+
+  .file-status {
+    font-size: 0.7rem;
+    color: #888;
+    margin-top: 0.4rem;
+  }
+
+  .file-status.loaded { color: #00d4aa; }
+
+  .placeholder {
+    color: #444;
+    font-size: 0.8rem;
+    text-align: center;
+    padding: 1rem 0;
+    letter-spacing: 0.05em;
+  }
+</style>
+</head>
+<body>
+
+<h1>Selezionatore Aspiratori</h1>
+<p class="subtitle">RH.XLS — selezione modello e calcolo portata</p>
+
+<!-- Caricamento file -->
+<div class="panel">
+  <div class="panel-title">Carica file Excel</div>
+  <div class="field">
+    <label>File RH.xls / RH.xlsx</label>
+    <input type="file" id="fileInput" accept=".xls,.xlsx">
+    <div class="file-status" id="fileStatus">Nessun file caricato</div>
+  </div>
+</div>
+
+<!-- Sezione calcolo portata -->
+<div class="panel">
+  <div class="panel-title">Calcolo portata da velocità</div>
+  <div class="field-row">
+    <div class="field">
+      <label>Velocità (m/s)</label>
+      <input type="number" id="velocita" placeholder="es. 12.5" step="0.1">
+    </div>
+    <div class="field">
+      <label>Diametro (mm)</label>
+      <input type="number" id="diametro" placeholder="es. 200" step="1">
+    </div>
+  </div>
+  <button class="btn btn-secondary" onclick="calcolaPortata()">↳ Calcola portata m³/h</button>
+  <div class="result-area" style="margin-top: 0.75rem;" id="risultatoPortata">
+    <div class="placeholder">Il risultato apparirà qui</div>
+  </div>
+</div>
+
+<!-- Sezione selezione aspiratore -->
+<div class="panel">
+  <div class="panel-title">Ricerca aspiratore</div>
+  <div class="field-row">
+    <div class="field">
+      <label>Portata (m³/h)</label>
+      <input type="number" id="portata" placeholder="es. 1200" step="1">
+    </div>
+    <div class="field">
+      <label>Perdita di carico (mmH₂O)</label>
+      <input type="number" id="prevalenza" placeholder="es. 50" step="0.5">
+    </div>
+  </div>
+  <button class="btn" onclick="trovaTuttiAspiratori()">▶ Trova aspiratore</button>
+  <div id="risultatoAspiratori" style="margin-top: 0.75rem;">
+    <div class="result-area">
+      <div class="placeholder">Carica il file e inserisci i dati per cercare</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let aspiratoriDict = {};
+let fileCaricato = false;
+
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+
+      aspiratoriDict = {};
+
+      wb.SheetNames.forEach(nomeFoglio => {
+        const ws = wb.Sheets[nomeFoglio];
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (raw.length < 2) return;
+
+        const headerRow = raw[0];
+        const colonne = [];
+        for (let i = 0; i < headerRow.length; i++) {
+          if (i < 5) {
+            colonne.push(String(i + 1));
+          } else {
+            const num = parseFloat(headerRow[i]);
+            colonne.push(isNaN(num) ? headerRow[i] : num);
+          }
+        }
+
+        const rows = [];
+        for (let r = 1; r < raw.length; r++) {
+          const obj = {};
+          for (let c = 0; c < colonne.length; c++) {
+            obj[colonne[c]] = raw[r][c] !== undefined ? raw[r][c] : '';
+          }
+          rows.push(obj);
+        }
+
+        aspiratoriDict[nomeFoglio] = { colonne, rows };
+      });
+
+      fileCaricato = true;
+      const fogli = Object.keys(aspiratoriDict).length;
+      const el = document.getElementById('fileStatus');
+      el.textContent = `✓ Caricato: ${file.name} — ${fogli} fogli trovati`;
+      el.className = 'file-status loaded';
+    } catch (err) {
+      const el = document.getElementById('fileStatus');
+      el.textContent = '✗ Errore nella lettura del file: ' + err.message;
+      el.className = 'file-status err';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+function calcolaPortata() {
+  const v = parseFloat(document.getElementById('velocita').value);
+  const d = parseFloat(document.getElementById('diametro').value);
+  const el = document.getElementById('risultatoPortata');
+
+  if (isNaN(v) || isNaN(d)) {
+    el.innerHTML = '<div class="placeholder" style="color:#e05555">Inserisci velocità e diametro validi</div>';
+    return;
+  }
+
+  const dm = d / 1000;
+  const q = (dm * dm) * v * Math.PI / 4 * 3600;
+
+  el.innerHTML = `<div class="result-row">
+    <span class="result-sheet">Portata calcolata</span>
+    <span class="result-portata">${q.toFixed(1)} m³/h</span>
+  </div>
+  <div class="result-row">
+    <span class="result-sheet">Diametro</span>
+    <span style="color:#ccc">${d} mm → ${(dm * 1000).toFixed(0)} mm</span>
+  </div>
+  <div class="result-row">
+    <span class="result-sheet">Velocità</span>
+    <span style="color:#ccc">${v} m/s</span>
+  </div>`;
+
+  document.getElementById('portata').value = q.toFixed(1);
+}
+
+function trovaAspiratore(dati, portata, prevalenza) {
+  const { colonne, rows } = dati;
+  const colonneNumeriche = colonne.slice(5).filter(c => typeof c === 'number');
+
+  if (colonneNumeriche.length === 0) return null;
+  const minPortata = Math.min(...colonneNumeriche);
+
+  if (portata < minPortata) return { errore: 'portata troppo piccola per questo aspiratore' };
+
+  let colonnaPiu = colonneNumeriche[0];
+  let diffMin = Math.abs(colonneNumeriche[0] - portata);
+  for (const c of colonneNumeriche) {
+    const d = Math.abs(c - portata);
+    if (d < diffMin) { diffMin = d; colonnaPiu = c; }
+  }
+
+  let rigaSel = null;
+  let diffPrev = Infinity;
+  for (const row of rows) {
+    const val = parseFloat(row[colonnaPiu]);
+    if (!isNaN(val)) {
+      const diff = val - prevalenza;
+      if (diff >= 0 && diff < diffPrev) {
+        diffPrev = diff;
+        rigaSel = row;
+      }
+    }
+  }
+
+  if (!rigaSel) return { errore: 'prevalenza fuori range' };
+  return { modello: rigaSel['1'] };
+}
+
+function trovaTuttiAspiratori() {
+  const q = parseFloat(document.getElementById('portata').value);
+  const p = parseFloat(document.getElementById('prevalenza').value);
+  const container = document.getElementById('risultatoAspiratori');
+
+  if (!fileCaricato) {
+    container.innerHTML = '<div class="result-area"><div class="placeholder" style="color:#e05555">Prima carica il file Excel</div></div>';
+    return;
+  }
+
+  if (isNaN(q) || isNaN(p)) {
+    container.innerHTML = '<div class="result-area"><div class="placeholder" style="color:#e05555">Inserisci portata e prevalenza validi</div></div>';
+    return;
+  }
+
+  let html = '<div class="result-area">';
+  let trovati = 0;
+
+  for (const [nomeFoglio, dati] of Object.entries(aspiratoriDict)) {
+    const res = trovaAspiratore(dati, q, p);
+    if (!res) continue;
+
+    if (res.errore) {
+      html += `<div class="result-row">
+        <span class="result-sheet">${nomeFoglio}</span>
+        <span class="result-value error">${res.errore}</span>
+      </div>`;
+    } else {
+      trovati++;
+      html += `<div class="result-row">
+        <span class="result-sheet">${nomeFoglio}</span>
+        <span class="result-value">${res.modello || '—'}</span>
+      </div>`;
+    }
+  }
+
+  if (Object.keys(aspiratoriDict).length === 0) {
+    html += '<div class="placeholder">Nessun foglio trovato nel file</div>';
+  }
+
+  html += `</div>`;
+  html += `<div class="status ok">▸ Ricerca completata — ${trovati} modelli compatibili su ${Object.keys(aspiratoriDict).length} fogli</div>`;
+
+  container.innerHTML = html;
+}
+</script>
+</body>
+</html>
