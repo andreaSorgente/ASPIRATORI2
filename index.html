@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Aspiratori RH</title>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<style>
+body { font-family: Arial; margin: 20px; }
+input, button { margin: 5px; padding: 5px; }
+#risultato { margin-top: 20px; white-space: pre-line; }
+</style>
+</head>
+
+<body>
+
+<h2>Selezionatore aspiratore RH</h2>
+
+<label>Portata (m³/h):</label>
+<input type="number" id="portata"><br>
+
+<label>Prevalenza (mmcaH2O):</label>
+<input type="number" id="prevalenza"><br>
+
+<button onclick="trovaAspiratore()">Trova aspiratore</button>
+
+<hr>
+
+<h2>Calcolo portata</h2>
+
+<label>Velocità (m/s):</label>
+<input type="number" id="velocita"><br>
+
+<label>Diametro (mm):</label>
+<input type="number" id="diametro"><br>
+
+<button onclick="calcolaPortata()">Calcola portata</button>
+
+<div id="risultato">Caricamento RH.xlsx...</div>
+
+<script>
+
+let aspiratori = {};
+
+// 🔥 CARICAMENTO AUTOMATICO RH.xlsx
+async function caricaExcel() {
+    const response = await fetch("RH.xlsx");
+    const data = await response.arrayBuffer();
+
+    const workbook = XLSX.read(data, {type: "array"});
+
+    aspiratori = {};
+
+    workbook.SheetNames.forEach(name => {
+        const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[name], {header:1});
+        aspiratori[name] = sheet;
+    });
+
+    document.getElementById("risultato").innerText =
+        "RH.xlsx caricato correttamente!";
+}
+
+caricaExcel();
+
+
+// ---- LOGICA ----
+function trovaAspiratoreSingolo(modello, q, p) {
+
+    let colonne = modello[0].slice(5).map(Number).filter(x => !isNaN(x));
+
+    if (q < Math.min(...colonne)) {
+        return "portata troppo piccola";
+    }
+
+    let colonnaTarget = colonne.reduce((a, b) =>
+        Math.abs(b - q) < Math.abs(a - q) ? b : a
+    );
+
+    let colIndex = modello[0].indexOf(colonnaTarget);
+
+    let bestRow = null;
+    let bestDiff = Infinity;
+
+    for (let i = 1; i < modello.length; i++) {
+        let val = modello[i][colIndex];
+        if (val >= p) {
+            let diff = Math.abs(val - p);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                bestRow = i;
+            }
+        }
+    }
+
+    return bestRow ? modello[bestRow][0] : "non trovato";
+}
+
+
+// ---- TROVA TUTTI ----
+function trovaAspiratore() {
+
+    let q = parseFloat(document.getElementById("portata").value);
+    let p = parseFloat(document.getElementById("prevalenza").value);
+
+    let testo = "";
+
+    for (let nome in aspiratori) {
+        let modello = aspiratori[nome];
+
+        let risultato = trovaAspiratoreSingolo(modello, q, p);
+
+        testo += `${nome}: ${risultato}\n`;
+    }
+
+    document.getElementById("risultato").innerText = testo;
+}
+
+
+// ---- PORTATA ----
+function calcolaPortata() {
+
+    let v = parseFloat(document.getElementById("velocita").value);
+    let d = parseFloat(document.getElementById("diametro").value);
+
+    let dm = d / 1000;
+    let q = ((dm ** 2) * v * Math.PI / 4) * 3600;
+
+    document.getElementById("risultato").innerText =
+        "Portata: " + q.toFixed(2) + " m³/h";
+}
+
+</script>
+
+</body>
+</html>
