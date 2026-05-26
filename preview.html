@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Selezionatore Aspiratori RH</title>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<style>
+
+:root{
+    --bg:#f4f7fb;
+    --card:#ffffff;
+    --primary:#2563eb;
+    --primary-dark:#1d4ed8;
+    --text:#1e293b;
+    --border:#dbe3ee;
+    --shadow:0 10px 25px rgba(0,0,0,0.08);
+    --radius:16px;
+}
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    padding:40px 20px;
+    background:var(--bg);
+    font-family:Arial, sans-serif;
+    color:var(--text);
+}
+
+.container{
+    max-width:900px;
+    margin:auto;
+}
+
+h1{
+    text-align:center;
+    margin-bottom:30px;
+    color:var(--primary);
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:25px;
+}
+
+.card{
+    background:var(--card);
+    border-radius:var(--radius);
+    padding:25px;
+    box-shadow:var(--shadow);
+}
+
+.card h2{
+    margin-top:0;
+    margin-bottom:20px;
+    font-size:22px;
+    color:var(--primary);
+}
+
+.input-group{
+    margin-bottom:15px;
+}
+
+label{
+    display:block;
+    margin-bottom:6px;
+    font-weight:bold;
+}
+
+input{
+    width:100%;
+    padding:12px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    font-size:15px;
+    transition:0.2s;
+}
+
+input:focus{
+    border-color:var(--primary);
+    outline:none;
+    box-shadow:0 0 0 4px rgba(37,99,235,0.15);
+}
+
+button{
+    width:100%;
+    padding:14px;
+    border:none;
+    border-radius:12px;
+    background:var(--primary);
+    color:white;
+    font-size:16px;
+    font-weight:bold;
+    cursor:pointer;
+    transition:0.2s;
+}
+
+button:hover{
+    background:var(--primary-dark);
+    transform:translateY(-1px);
+}
+
+#risultato{
+    margin-top:30px;
+    background:white;
+    border-radius:var(--radius);
+    padding:25px;
+    box-shadow:var(--shadow);
+    white-space:pre-line;
+    font-family:Consolas, monospace;
+    min-height:120px;
+}
+
+.status{
+    color:#16a34a;
+    font-weight:bold;
+}
+
+@media(max-width:700px){
+
+    .grid{
+        grid-template-columns:1fr;
+    }
+
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>🔧 Selezionatore Aspiratori RH</h1>
+
+    <div class="grid">
+
+        <!-- CARD ASPIRATORE -->
+        <div class="card">
+
+            <h2>Ricerca aspiratore</h2>
+
+            <div class="input-group">
+                <label>Portata (m³/h)</label>
+                <input type="number" id="portata" placeholder="Es. 5000">
+            </div>
+
+            <div class="input-group">
+                <label>Prevalenza (mmcaH₂O)</label>
+                <input type="number" id="prevalenza" placeholder="Es. 120">
+            </div>
+
+            <button onclick="trovaAspiratore()">
+                Trova aspiratore
+            </button>
+
+        </div>
+
+        <!-- CARD PORTATA -->
+        <div class="card">
+
+            <h2>Calcolo portata</h2>
+
+            <div class="input-group">
+                <label>Velocità (m/s)</label>
+                <input type="number" id="velocita" placeholder="Es. 15">
+            </div>
+
+            <div class="input-group">
+                <label>Diametro tubo (mm)</label>
+                <input type="number" id="diametro" placeholder="Es. 250">
+            </div>
+
+            <button onclick="calcolaPortata()">
+                Calcola portata
+            </button>
+
+        </div>
+
+    </div>
+
+    <div id="risultato">
+        ⏳ Caricamento RH.xlsx...
+    </div>
+
+</div>
+
+<script>
+
+let aspiratori = {};
+
+// ================================
+// CARICAMENTO EXCEL
+// ================================
+
+async function caricaExcel() {
+
+    try {
+
+        const response = await fetch("RH.xlsx");
+
+        if (!response.ok) {
+            throw new Error("File RH.xlsx non trovato");
+        }
+
+        const data = await response.arrayBuffer();
+
+        const workbook = XLSX.read(data, {type: "array"});
+
+        aspiratori = {};
+
+        workbook.SheetNames.forEach(name => {
+
+            const sheet = XLSX.utils.sheet_to_json(
+                workbook.Sheets[name],
+                {header:1}
+            );
+
+            aspiratori[name] = sheet;
+
+        });
+
+        document.getElementById("risultato").innerHTML =
+            '<span class="status">✅ RH.xlsx caricato correttamente!</span>';
+
+    }
+    catch(err){
+
+        document.getElementById("risultato").innerHTML =
+            "❌ Errore caricamento Excel:<br><br>" + err.message;
+
+    }
+
+}
+
+caricaExcel();
+
+
+// ================================
+// TROVA ASPIRATORE SINGOLO
+// ================================
+
+function trovaAspiratoreSingolo(modello, q, p) {
+
+    let colonne = modello[0]
+        .slice(5)
+        .map(Number)
+        .filter(x => !isNaN(x));
+
+    if (colonne.length === 0) {
+        return "Dati non validi";
+    }
+
+    if (q < Math.min(...colonne)) {
+        return "Portata troppo piccola";
+    }
+
+    // prima colonna >= q
+    let colonnaTarget = colonne.find(x => x >= q);
+
+    if (!colonnaTarget) {
+        colonnaTarget = colonne[colonne.length - 1];
+    }
+
+    let colIndex = modello[0].indexOf(colonnaTarget);
+
+    let bestRow = null;
+    let bestDiff = Infinity;
+
+    for (let i = 1; i < modello.length; i++) {
+
+        let val = Number(modello[i][colIndex]);
+
+        if (!isNaN(val) && val >= p) {
+
+            let diff = Math.abs(val - p);
+
+            if (diff < bestDiff) {
+
+                bestDiff = diff;
+                bestRow = i;
+
+            }
+
+        }
+
+    }
+
+    return bestRow !== null
+        ? modello[bestRow][0]
+        : "Non trovato";
+
+}
+
+
+// ================================
+// TROVA TUTTI
+// ================================
+
+function trovaAspiratore() {
+
+    let q = parseFloat(
+        document.getElementById("portata").value
+    );
+
+    let p = parseFloat(
+        document.getElementById("prevalenza").value
+    );
+
+    if (isNaN(q) || isNaN(p)) {
+
+        document.getElementById("risultato").innerHTML =
+            "⚠️ Inserire portata e prevalenza valide.";
+
+        return;
+
+    }
+
+    let testo = "RISULTATI SELEZIONE\n\n";
+
+    for (let nome in aspiratori) {
+
+        let modello = aspiratori[nome];
+
+        let risultato =
+            trovaAspiratoreSingolo(modello, q, p);
+
+        testo += `• ${nome}: ${risultato}\n`;
+
+    }
+
+    document.getElementById("risultato").innerText = testo;
+
+}
+
+
+// ================================
+// CALCOLO PORTATA
+// ================================
+
+function calcolaPortata() {
+
+    let v = parseFloat(
+        document.getElementById("velocita").value
+    );
+
+    let d = parseFloat(
+        document.getElementById("diametro").value
+    );
+
+    if (isNaN(v) || isNaN(d)) {
+
+        document.getElementById("risultato").innerHTML =
+            "⚠️ Inserire valori validi.";
+
+        return;
+
+    }
+
+    let dm = d / 1000;
+
+    let q =
+        ((dm ** 2) * v * Math.PI / 4) * 3600;
+
+    document.getElementById("risultato").innerHTML =
+        `
+        <strong>Risultato calcolo</strong><br><br>
+        Portata = <strong>${q.toFixed(2)} m³/h</strong>
+        `;
+
+}
+
+</script>
+
+</body>
+</html>
